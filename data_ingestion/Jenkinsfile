@@ -1,0 +1,26 @@
+pipeline {
+    agent any
+    stages {
+        stage('Build') {
+            steps {
+                script {
+                    sh 'docker build -t kirtinigam003/data_ingestion:latest .'
+                }
+            }
+        }
+        stage('Push') {
+            steps {
+                script {
+                    sh 'docker push kirtinigam003/data_ingestion:latest'
+                }
+            }
+        }
+        stage('Deploy') {
+            steps {
+                script {
+                    sh 'kubectl apply -f ../kubernetes/data_ingestion_deployment.yaml'
+                }
+            }
+        }
+    }
+}
