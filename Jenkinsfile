@@ -39,6 +39,8 @@ pipeline {
                 withCredentials([file(credentialsId: 'kubeconfig', variable: 'KUBECONFIG')]) {
                     sh '''
                         kubectl config view
+                        kubectl apply -f kubernetes/pv.yaml
+                        kubectl apply -f kubernetes/pvc.yaml
                         kubectl apply -f kubernetes/data_ingestion_deployment.yaml
                         kubectl apply -f kubernetes/model_training_deployment.yaml
                         kubectl apply -f kubernetes/model_serving_deployment.yaml
