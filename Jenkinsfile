@@ -10,7 +10,7 @@ pipeline {
                 echo "Using kubeconfig at $KUBECONFIG"
                 kubectl config view --minify
                 kubectl get nodes
-                kubectl apply -f kubernetes/data_ingestion_deployment.yaml --validate=false
+                kubectl apply -f kubernetes/deployment/data_ingestion_deployment.yaml --validate=false
                 '''
             }
         }
@@ -41,12 +41,14 @@ pipeline {
                         kubectl config view
                         kubectl apply -f kubernetes/pv.yaml
                         kubectl apply -f kubernetes/pvc.yaml
-                        kubectl apply -f kubernetes/data_ingestion_deployment.yaml
-                        kubectl apply -f kubernetes/model_training_deployment.yaml
-                        kubectl apply -f kubernetes/model_serving_deployment.yaml
-                        kubectl apply -f kubernetes/model_serving_service.yaml
-                        kubectl apply -f kubernetes/data_ingestion_service.yaml
-                        kubectl apply -f kubernetes/model_training_service.yaml
+                        kubectl apply -f kubernetes/deployement/data_ingestion_deployment.yaml
+                        kubectl apply -f kubernetes/deployement/model_training_deployment.yaml
+                        kubectl apply -f kubernetes/deployement/drift_detection_deployment.yaml
+                        kubectl apply -f kubernetes/deployement/model_serving_deployment.yaml
+                        kubectl apply -f kubernetes/service/model_serving_service.yaml
+                        kubectl apply -f kubernetes/service/data_ingestion_service.yaml
+                        kubectl apply -f kubernetes/service/model_training_service.yaml
+                        kubectl apply -f kubernetes/service/drift_detection_service.yaml
                     '''
                 }
             }

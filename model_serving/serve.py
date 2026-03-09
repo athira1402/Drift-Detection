@@ -1,15 +1,26 @@
 from flask import Flask, request, jsonify
 import pandas as pd
 import pickle
+import os
 
 app = Flask(__name__)
 
-with open("churn_model.pkl", "rb") as f:
-    model = pickle.load(f)
+# Path to PVC mount
+MODEL_PATH = "/data/churn-model/churn_model.pkl"
+
+# Load model from PVC
+if os.path.exists(MODEL_PATH):
+    with open(MODEL_PATH, "rb") as f:
+        model = pickle.load(f)
+else:
+    model = None
 
 @app.route('/predict', methods=['POST'])
 def predict():
     try:
+        if model is None:
+            return jsonify({"error": "No model found in PVC"}), 500
+
         data = request.get_json()
         df = pd.DataFrame(data)
 

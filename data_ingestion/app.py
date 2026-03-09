@@ -1,7 +1,7 @@
 from flask import Flask, request, jsonify
 import pandas as pd
-import requests   
-import os, requests
+import requests
+import os
 
 app = Flask(__name__)
 
@@ -14,18 +14,19 @@ def ingest_data():
         if 'customerID' not in df.columns or 'Churn' not in df.columns:
             return jsonify({"error": "Invalid schema"}), 400
 
+        # Forward to serving for predictions
+        serving_url = os.getenv("SERVING_URL")
+        serving_response = requests.post(serving_url, json=data)
 
-        training_url = os.getenv("TRAINING_URL")
-        # Forward cleaned data to training microservice
-        response = requests.post(
-            training_url,
-            json=data
-        )
+        # Forward to drift detection
+        drift_url = os.getenv("DRIFT_URL")
+        drift_response = requests.post(drift_url, json=data)
 
         return jsonify({
-            "status": "forwarded to training",
+            "status": "ingested",
             "rows": len(df),
-            "training_response": response.json()
+            "serving_response": serving_response.json(),
+            "drift_response": drift_response.json()
         })
     except Exception as e:
         return jsonify({"error": str(e)}), 500

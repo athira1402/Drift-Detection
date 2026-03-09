@@ -1,0 +1,30 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: drift-detection
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: drift-detection
+  template:
+    metadata:
+      labels:
+        app: drift-detection
+    spec:
+      containers:
+      - name: drift-detection
+        image: kirtinigam003/drift-detection:latest
+        ports:
+        - containerPort: 5003
+        env:
+        # Training microservice endpoint (used when drift is detected)
+        - name: TRAINING_URL
+          value: http://model-training-service.default.svc.cluster.local:5001/train
+        volumeMounts:
+        - name: churn-model-storage
+          mountPath: /data/churn-model
+      volumes:
+      - name: churn-model-storage
+        persistentVolumeClaim:
+          claimName: churn-model-pvc
