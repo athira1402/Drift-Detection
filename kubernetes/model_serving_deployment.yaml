@@ -19,7 +19,7 @@ spec:
         - containerPort: 5002
         volumeMounts:                
         - name: churn-model-storage
-          mountPath: /app
+          mountPath: /data/churn-model 
       volumes:                      
       - name: churn-model-storage
         persistentVolumeClaim:
