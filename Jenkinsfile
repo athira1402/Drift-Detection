@@ -19,6 +19,8 @@ pipeline {
                     # We use the -m flag just like you did in the terminal
                     python3 -m unittest data_ingestion/tests/test_ingestion.py
                     python3 -m unittest drift_detection/tests/test_drift_detection.py
+                    python3 -m unittest model_serving/tests/test_serving.py
+                    python3 -m unittest model_training/tests/test_training.py
                 '''
             }
         }

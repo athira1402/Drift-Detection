@@ -6,6 +6,8 @@ import os
 
 app = Flask(__name__)
 
+pvc_path = "/data/churn-model"
+
 @app.route('/train', methods=['POST'])
 def train_model():
     try:
@@ -20,9 +22,6 @@ def train_model():
         # Train model
         model = LogisticRegression()
         model.fit(X, y)
-
-        # PVC mount path
-        pvc_path = "/data/churn-model"
 
         # Save model to PVC
         model_path = os.path.join(pvc_path, "churn_model.pkl")
