@@ -4,6 +4,23 @@ pipeline {
         KUBECONFIG = credentials('kubeconfig')  // Jenkins secret file with kubeconfig
     }
     stages {
+
+        stage('Run Unit Tests') {
+            steps {
+                sh '''
+                    # 1. Setup virtual environment (recommended)
+                    python3 -m venv venv
+                    . venv/bin/activate
+
+                    # 2. Install dependencies
+                    pip install -r data_ingestion/requirements.txt
+                    
+                    # 3. Run the tests from the root
+                    # We use the -m flag just like you did in the terminal
+                    python3 -m unittest data_ingestion/tests/test_ingestion.py
+                '''
+            }
+        }
         stage('Build Data Ingestion') {
             steps {
                 dir('data_ingestion') {
