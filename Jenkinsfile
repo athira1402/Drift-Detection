@@ -38,8 +38,8 @@ pipeline {
 
                     // 2. Start the Stack
                     // We use --build to ensure the 'global model' fix is included
-                    sh 'sudo docker compose -f docker-compose.test.yml down --remove-orphans'
-                    sh 'sudo docker compose -f docker-compose.test.yml up --build -d'
+                    sh 'docker compose -f docker-compose.test.yml down --remove-orphans'
+                    sh 'docker compose -f docker-compose.test.yml up --build -d'
                     
                     echo "Waiting for Flask services to initialize..."
                     sleep 15
@@ -77,7 +77,7 @@ pipeline {
                         echo "SUCCESS: Ingest, Serving, and Drift services are all synchronized."
                     } else {
                         // If it fails, print logs to Jenkins console for debugging
-                        sh 'sudo docker compose -f docker-compose.test.yml logs'
+                        sh 'docker compose -f docker-compose.test.yml logs'
                         error "Integration Test Failed. Response received: ${response}"
                     }
                 }
@@ -85,7 +85,7 @@ pipeline {
             post {
                 always {
                     // Clean up to free up ports 5000-5004 for the next build
-                    sh 'sudo docker compose -f docker-compose.test.yml down'
+                    sh 'docker compose -f docker-compose.test.yml down'
                 }
             }
         }
