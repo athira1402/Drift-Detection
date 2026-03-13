@@ -16,7 +16,10 @@ def ingest_data():
 
         # Forward to serving for predictions
         serving_url = os.getenv("SERVING_URL")
-        serving_response = requests.post(serving_url, json=data)
+        print(f"Attempting to reach Serving at: {serving_url}")
+
+        # Add a 5 second timeout
+        serving_response = requests.post(serving_url, json=data, timeout=5)
 
         # Forward to drift detection
         drift_url = os.getenv("DRIFT_URL")

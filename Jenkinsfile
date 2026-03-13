@@ -24,6 +24,71 @@ pipeline {
                 '''
             }
         }
+        stage('Integration Testing') {
+            options {
+                // Prevents the job from hanging forever if something goes wrong
+                timeout(time: 5, unit: 'MINUTES')
+            }
+            steps {
+                script {
+                    // 1. Identify the Host IP (Required for Host Networking mode)
+                    // This gets the primary IP of the Ubuntu runner
+                    def hostIp = sh(script: "hostname -I | awk '{print \$1}'", returnStdout: true).trim()
+                    echo "Detected Host IP for Integration: ${hostIp}"
+
+                    // 2. Start the Stack
+                    // We use --build to ensure the 'global model' fix is included
+                    sh 'sudo docker compose -f docker-compose.test.yml down --remove-orphans'
+                    sh 'sudo docker compose -f docker-compose.test.yml up --build -d'
+                    
+                    echo "Waiting for Flask services to initialize..."
+                    sleep 15
+
+                    // 3. Bootstrap: Train the model
+                    // We MUST do this first so the 'serving' service has a model to load
+                    echo "Training baseline model..."
+                    def trainStatus = sh(script: """
+                        curl -s -X POST http://${hostIp}:5001/train \
+                        -H "Content-Type: application/json" \
+                        -d '[
+                            {"Age": 30, "Tenure": 5, "Balance": 1000, "Churn": "No"},
+                            {"Age": 45, "Tenure": 1, "Balance": 8000, "Churn": "Yes"}
+                        ]'
+                    """, returnStdout: true).trim()
+                    
+                    echo "Training Response: ${trainStatus}"
+                    if (!trainStatus.contains("success")) {
+                        error "Model Training failed, cannot proceed with Integration Test."
+                    }
+
+                    // 4. Integration Test: Full Data Ingestion
+                    echo "Running Full Pipeline Test..."
+                    def response = sh(script: """
+                        curl -s -X POST http://${hostIp}:5000/ingest \
+                        -H "Content-Type: application/json" \
+                        -d '[{"customerID": "123", "Age": 35, "Tenure": 3, "Balance": 2500, "Churn": "No"}]'
+                    """, returnStdout: true).trim()
+
+                    echo "Full Pipeline Response: ${response}"
+
+                    // 5. Validation Logic
+                    // We check for 'ingested' AND ensure no Python 'error' exists in the nested responses
+                    if (response.contains("ingested") && !response.contains("error")) {
+                        echo "SUCCESS: Ingest, Serving, and Drift services are all synchronized."
+                    } else {
+                        // If it fails, print logs to Jenkins console for debugging
+                        sh 'sudo docker compose -f docker-compose.test.yml logs'
+                        error "Integration Test Failed. Response received: ${response}"
+                    }
+                }
+            }
+            post {
+                always {
+                    // Clean up to free up ports 5000-5004 for the next build
+                    sh 'sudo docker compose -f docker-compose.test.yml down'
+                }
+            }
+        }
         stage('Build Data Ingestion') {
             steps {
                 dir('data_ingestion') {

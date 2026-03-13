@@ -8,19 +8,23 @@ app = Flask(__name__)
 # Path to PVC mount
 MODEL_PATH = "/data/churn-model/churn_model.pkl"
 
-# Load model from PVC
-if os.path.exists(MODEL_PATH):
-    with open(MODEL_PATH, "rb") as f:
-        model = pickle.load(f)
-else:
-    model = None
-
+# # Load model from PVC
+# if os.path.exists(MODEL_PATH):
+#     with open(MODEL_PATH, "rb") as f:
+#         model = pickle.load(f)
+# else:
+#     model = None
+model = None
 @app.route('/predict', methods=['POST'])
 def predict():
     try:
+        global model
         if model is None:
-            return jsonify({"error": "No model found in PVC"}), 500
-
+            if os.path.exists(MODEL_PATH):
+                with open(MODEL_PATH, "rb") as f:
+                    model = pickle.load(f)
+            else:
+                return jsonify({"error": "No model found in PVC"}), 500
         data = request.get_json()
         df = pd.DataFrame(data)
 
