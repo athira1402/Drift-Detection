@@ -3,6 +3,11 @@
   apt:
     name: [apt-transport-https, ca-certificates, curl, gnupg, lsb-release]
     update_cache: yes
+    cache_valid_time: 3600 # Don't update if it was updated in the last hour
+  register: apt_res
+  until: apt_res is success
+  retries: 5
+  delay: 10
 
 - name: Add Docker GPG key
   apt_key:
