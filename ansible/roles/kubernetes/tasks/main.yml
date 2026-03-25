@@ -24,3 +24,10 @@
     group: jenkins
     mode: '0600'
     remote_src: yes
+
+- name: Ensure Python venv is installed
+  apt:
+    name: python3.12-venv
+    state: present
+    update_cache: yes
+  become: yes
