@@ -80,6 +80,10 @@ pipeline {
         }
 
         stage('Build & Push Images') {
+          steps {
+                // Wrap the entire parallel block in credentials
+                withCredentials([usernamePassword(credentialsId: 'DockerHubCred', usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PASS')]) {
+           script {
             parallel {
                 stage('Ingestion') {
                     steps {
@@ -114,6 +118,8 @@ pipeline {
                     }
                 }
             }
+	  }
+         }	
         }
 
         stage('Deploy to Kubernetes') {
