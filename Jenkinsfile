@@ -131,6 +131,7 @@ pipeline {
         stage('Deploy to Kubernetes') {
             steps {
                 sh '''
+		    export KUBECONFIG=/home/athira/.kube/config
                     # Ensure PV/PVC exist first
                     kubectl apply -f kubernetes/pv.yaml
                     kubectl apply -f kubernetes/pvc.yaml
