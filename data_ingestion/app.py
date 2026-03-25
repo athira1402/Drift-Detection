@@ -9,7 +9,7 @@ app = Flask(__name__)
 def ingest_data():
     try:
         data = request.get_json()
-        df = pd.DataFrame(data)
+        df = pd.DataFrame([data])
 
         if 'customerID' not in df.columns or 'Churn' not in df.columns:
             return jsonify({"error": "Invalid schema"}), 400
