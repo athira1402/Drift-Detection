@@ -80,47 +80,48 @@ pipeline {
         }
 
         stage('Build & Push Images') {
-          steps {
-                // Wrap the entire parallel block in credentials
-                withCredentials([usernamePassword(credentialsId: 'DockerHubCred', usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PASS')]) {
-           script {
             parallel {
                 stage('Ingestion') {
                     steps {
                         dir('data_ingestion') {
-                            sh 'docker build -t athira1402/data_ingestion:latest -f Dockerfile.ingest .'
+                          withCredentials([usernamePassword(credentialsId: 'DockerHubCred', usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PASS')]) {  
+			    sh 'docker build -t athira1402/data_ingestion:latest -f Dockerfile.ingest .'
                             sh 'docker push athira1402/data_ingestion:latest'
                         }
+		      }
                     }
                 }
                 stage('Training') {
                     steps {
                         dir('model_training') {
-                            sh 'docker build -t athira1402/model_training:latest -f Dockerfile.training .'
+                          withCredentials([usernamePassword(credentialsId: 'DockerHubCred', usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PASS')]) {  
+			    sh 'docker build -t athira1402/model_training:latest -f Dockerfile.training .'
                             sh 'docker push athira1402/model_training:latest'
                         }
+		      }	
                     }
                 }
                 stage('Serving') {
                     steps {
                         dir('model_serving') {
-                            sh 'docker build -t athira1402/model_serving:latest -f Dockerfile.serving .'
+                          withCredentials([usernamePassword(credentialsId: 'DockerHubCred', usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PASS')]) {
+			    sh 'docker build -t athira1402/model_serving:latest -f Dockerfile.serving .'
                             sh 'docker push athira1402/model_serving:latest'
                         }
+                      }
                     }
                 }
                 stage('Drift') {
                     steps {
                         dir('drift_detection') {
+			  withCredentials([usernamePassword(credentialsId: 'DockerHubCred', usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PASS')]) {             
                             sh 'docker build -t athira1402/drift_detection:latest -f Dockerfile.drift .'
                             sh 'docker push athira1402/drift_detection:latest'
-                        }
+                          }
+			}
                     }
                 }
             }
-	  }
-         }	
-	 }
         }
 
         stage('Deploy to Kubernetes') {
