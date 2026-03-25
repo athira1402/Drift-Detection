@@ -84,32 +84,32 @@ pipeline {
                 stage('Ingestion') {
                     steps {
                         dir('data_ingestion') {
-                            sh 'docker build -t kirtinigam003/data_ingestion:latest -f Dockerfile.ingest .'
-                            sh 'docker push kirtinigam003/data_ingestion:latest'
+                            sh 'docker build -t athira1402/data_ingestion:latest -f Dockerfile.ingest .'
+                            sh 'docker push athira1402/data_ingestion:latest'
                         }
                     }
                 }
                 stage('Training') {
                     steps {
                         dir('model_training') {
-                            sh 'docker build -t kirtinigam003/model_training:latest -f Dockerfile.training .'
-                            sh 'docker push kirtinigam003/model_training:latest'
+                            sh 'docker build -t athira1402/model_training:latest -f Dockerfile.training .'
+                            sh 'docker push athira1402/model_training:latest'
                         }
                     }
                 }
                 stage('Serving') {
                     steps {
                         dir('model_serving') {
-                            sh 'docker build -t kirtinigam003/model_serving:latest -f Dockerfile.serving .'
-                            sh 'docker push kirtinigam003/model_serving:latest'
+                            sh 'docker build -t athira1402/model_serving:latest -f Dockerfile.serving .'
+                            sh 'docker push athira1402/model_serving:latest'
                         }
                     }
                 }
                 stage('Drift') {
                     steps {
                         dir('drift_detection') {
-                            sh 'docker build -t kirtinigam003/drift_detection:latest -f Dockerfile.drift .'
-                            sh 'docker push kirtinigam003/drift_detection:latest'
+                            sh 'docker build -t athira1402/drift_detection:latest -f Dockerfile.drift .'
+                            sh 'docker push athira1402/drift_detection:latest'
                         }
                     }
                 }
