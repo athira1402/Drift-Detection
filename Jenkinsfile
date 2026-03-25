@@ -85,6 +85,7 @@ pipeline {
                     steps {
                         dir('data_ingestion') {
                           withCredentials([usernamePassword(credentialsId: 'DockerHubCred', usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PASS')]) {  
+                            sh "echo \$DOCKER_PASS | docker login -u \$DOCKER_USER --password-stdin"
 			    sh 'docker build -t athira1402/data_ingestion:latest -f Dockerfile.ingest .'
                             sh 'docker push athira1402/data_ingestion:latest'
                         }
@@ -95,6 +96,7 @@ pipeline {
                     steps {
                         dir('model_training') {
                           withCredentials([usernamePassword(credentialsId: 'DockerHubCred', usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PASS')]) {  
+			    sh "echo \$DOCKER_PASS | docker login -u \$DOCKER_USER --password-stdin"
 			    sh 'docker build -t athira1402/model_training:latest -f Dockerfile.training .'
                             sh 'docker push athira1402/model_training:latest'
                         }
@@ -105,6 +107,7 @@ pipeline {
                     steps {
                         dir('model_serving') {
                           withCredentials([usernamePassword(credentialsId: 'DockerHubCred', usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PASS')]) {
+                            sh "echo \$DOCKER_PASS | docker login -u \$DOCKER_USER --password-stdin"
 			    sh 'docker build -t athira1402/model_serving:latest -f Dockerfile.serving .'
                             sh 'docker push athira1402/model_serving:latest'
                         }
@@ -114,7 +117,8 @@ pipeline {
                 stage('Drift') {
                     steps {
                         dir('drift_detection') {
-			  withCredentials([usernamePassword(credentialsId: 'DockerHubCred', usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PASS')]) {             
+			  withCredentials([usernamePassword(credentialsId: 'DockerHubCred', usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PASS')]) {
+                            sh "echo \$DOCKER_PASS | docker login -u \$DOCKER_USER --password-stdin"             
                             sh 'docker build -t athira1402/drift_detection:latest -f Dockerfile.drift .'
                             sh 'docker push athira1402/drift_detection:latest'
                           }
