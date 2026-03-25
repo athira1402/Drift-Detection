@@ -131,6 +131,19 @@ pipeline {
         stage('Deploy to Kubernetes') {
             steps {
                 sh '''
+
+		    export MINIKUBE_HOME=/home/athira
+                    export KUBECONFIG=/home/athira/.kube/config
+                        
+                    # Check if minikube is running. If not, fail early with a clear message.
+                    STATUS=$(minikube status --format='{{.Host}}' || echo "Stopped")
+                    if [ "$STATUS" != "Running" ]; then
+                        echo "❌ ERROR: Minikube is not running! Please run 'minikube start' on the server."
+                        exit 1
+                    fi
+
+                    echo "✅ Minikube is up. Proceeding with deployment..."
+
 		    export KUBECONFIG=/home/athira/.kube/config
                     # Ensure PV/PVC exist first
                     kubectl apply -f kubernetes/pv.yaml
