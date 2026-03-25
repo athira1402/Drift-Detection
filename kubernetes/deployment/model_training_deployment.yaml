@@ -14,7 +14,7 @@ spec:
     spec:
       containers:
       - name: model-training
-        image: kirtinigam003/model_training:latest
+        image: athira1402/model_training:latest
         ports:
         - containerPort: 5001
         volumeMounts:                
