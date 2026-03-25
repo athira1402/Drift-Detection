@@ -120,6 +120,7 @@ pipeline {
             }
 	  }
          }	
+	 }
         }
 
         stage('Deploy to Kubernetes') {
