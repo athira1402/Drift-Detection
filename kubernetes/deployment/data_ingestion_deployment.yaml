@@ -14,7 +14,7 @@ spec:
     spec:
       containers:
       - name: data-ingestion
-        image: kirtinigam003/data_ingestion:latest
+        image: athira1402/data_ingestion:latest
         ports:
         - containerPort: 5000
         env:
