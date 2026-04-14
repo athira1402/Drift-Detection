@@ -14,29 +14,23 @@ spec:
     spec:
       containers:
       - name: data-ingestion
-        image: athira1402/data_ingestion:latest
-        # env belongs to the container!
-        env:
-        - name: TRAINING_URL
-          value: http://model-training-service.default.svc.cluster.local:5001/train
-        - name: SERVING_URL
-          value: http://model-serving-service.default.svc.cluster.local:5002/predict
-        - name: DRIFT_URL
-          value: http://drift-detection-service.default.svc.cluster.local:5003/drift
-        ports:
-        - containerPort: 5000
+        image: kirtinigam003/data_ingestion:latest
         resources:
           requests:
-            cpu: "100m"
+            cpu: "100m"      # 0.1 CPU core
             memory: "128Mi"
           limits:
             cpu: "500m"
             memory: "512Mi"
-        volumeMounts:
-        - name: model-storage
-          mountPath: /mnt/data
-      # volumes is a sibling to containers
-      volumes:
-      - name: model-storage
-        persistentVolumeClaim:
-          claimName: churn-model-pvc
+        ports:
+        - containerPort: 5000
+        env:
+        - name: TRAINING_URL
+          value: http://model-training-service.default.svc.cluster.local:5001/train
+          
+        - name: SERVING_URL
+          value: http://model-serving-service.default.svc.cluster.local:5002/predict
+
+        # Drift detection microservice endpoint
+        - name: DRIFT_URL
+          value: http://drift-detection-service.default.svc.cluster.local:5003/drift

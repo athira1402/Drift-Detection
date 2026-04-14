@@ -14,7 +14,7 @@ spec:
     spec:
       containers:
       - name: drift-detection
-        image: athira1402/drift_detection:latest
+        image: kirtinigam003/drift_detection:latest
         resources:
           requests:
             cpu: "100m"      # 0.1 CPU core
@@ -22,7 +22,6 @@ spec:
           limits:
             cpu: "500m"
             memory: "512Mi"
-
         ports:
         - containerPort: 5003
         env:

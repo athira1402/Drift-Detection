@@ -14,7 +14,7 @@ spec:
     spec:
       containers:
       - name: model-serving
-        image: athira1402/model_serving:latest
+        image: kirtinigam003/model_serving:latest
         resources:
           requests:
             cpu: "100m"      # 0.1 CPU core
@@ -22,7 +22,6 @@ spec:
           limits:
             cpu: "500m"
             memory: "512Mi"
-
         ports:
         - containerPort: 5002
         volumeMounts:                
