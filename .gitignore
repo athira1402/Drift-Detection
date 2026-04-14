@@ -15,9 +15,9 @@ venv/
 
 # Data artifacts
 data/
-*.pkl
-*.pickle
 *.joblib
+
+!data/churn-model/train.csv
 
 # Docker
 *.pid
