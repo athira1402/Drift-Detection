@@ -26,7 +26,7 @@ pipeline {
                 sh '''
                     python3 -m venv venv
                     . venv/bin/activate
-                    pip install -r data_ingestion/requirements.txt
+                    pip install -r requirements.txt
                     python3 -m unittest data_ingestion/tests/test_ingestion.py
                     python3 -m unittest drift_detection/tests/test_drift_detection.py
                     python3 -m unittest model_serving/tests/test_serving.py
@@ -55,15 +55,77 @@ pipeline {
                     def trainStatus = sh(script: """
                         curl -s -X POST http://${hostIp}:5001/train \
                         -H "Content-Type: application/json" \
-                        -d '[{"Age": 30, "Tenure": 5, "Balance": 1000, "Churn": "No"}, {"Age": 45, "Tenure": 1, "Balance": 8000, "Churn": "Yes"}]'
+                        -d '[{
+                            "CustomerId": 1,
+                            "CreditScore": 600,
+                            "Geography": "France",
+                            "Gender": "Male",
+                            "Age": 30,
+                            "Tenure": 5,
+                            "Balance": 1000.0,
+                            "NumOfProducts": 1,
+                            "HasCrCard": 1,
+                            "IsActiveMember": 1,
+                            "EstimatedSalary": 40000.0,
+                            "Exited": 0
+                        },
+                        {
+                            "CustomerId": 2,
+                            "CreditScore": 650,
+                            "Geography": "Germany",
+                            "Gender": "Female",
+                            "Age": 45,
+                            "Tenure": 1,
+                            "Balance": 8000.0,
+                            "NumOfProducts": 2,
+                            "HasCrCard": 0,
+                            "IsActiveMember": 0,
+                            "EstimatedSalary": 50000.0,
+                            "Exited": 1
+                        }]'
                     """, returnStdout: true).trim()
                     
                     if (!trainStatus.contains("success")) {
                         error "Model Training failed: ${trainStatus}"
                     }
 
+                    sh 'docker exec driftdetection-training-1 ls -l /data/churn-model'
+                    echo "Waiting for training artifacts..."
+                    sleep 10
+
                     // Full Pipeline Test
-                    def response = sh(script: "curl -s -X POST http://${hostIp}:5000/ingest -H 'Content-Type: application/json' -d '[{\"customerID\": \"123\", \"Age\": 35, \"Tenure\": 3, \"Balance\": 2500, \"Churn\": \"No\"}]'", returnStdout: true).trim()
+                    def response = sh(script: """
+                        curl -s -X POST http://${hostIp}:5000/ingest \
+                        -H 'Content-Type: application/json' \
+                        -d '[{
+                            "CustomerId": 123,
+                            "CreditScore": 700,
+                            "Geography": "Spain",
+                            "Gender": "Female",
+                            "Age": 35,
+                            "Tenure": 3,
+                            "Balance": 2500.0,
+                            "NumOfProducts": 1,
+                            "HasCrCard": 1,
+                            "IsActiveMember": 1,
+                            "EstimatedSalary": 45000.0,
+                            "Exited": 0
+                        },
+                        {
+                            "CustomerId": 1234,
+                            "CreditScore": 600,
+                            "Geography": "Germany",
+                            "Gender": "Female",
+                            "Age": 35,
+                            "Tenure": 4,
+                            "Balance": 4000.0,
+                            "NumOfProducts": 1,
+                            "HasCrCard": 1,
+                            "IsActiveMember": 1,
+                            "EstimatedSalary": 60000.0,
+                            "Exited": 1
+                        }]'
+                    """, returnStdout: true).trim()
                     echo "Full Pipeline Response: ${response}"
 
                     if (response.contains("error") || !response.contains("ingested")) {
@@ -74,7 +136,9 @@ pipeline {
             }
             post {
                 always {
-                    sh 'docker compose -f docker-compose.test.yml down'
+                    sh 'docker compose -f docker-compose.test.yml ps -a'
+                    sh 'docker compose -f docker-compose.test.yml logs training'
+                    sh 'docker compose -f docker-compose.test.yml down || true'
                 }
             }
         }
