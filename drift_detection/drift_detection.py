@@ -11,6 +11,20 @@ app = Flask(__name__)
 # Path to PVC mount
 PVC_PATH = "/data/churn-model"
 
+import logging, json
+
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(message)s'   # ONLY print message (no INFO:root prefix)
+)
+
+def log_event(service, status, extra=None):
+    event = {"service": service, "status": status}
+    if extra:
+        event.update(extra)
+    logging.info(json.dumps(event))
+
+
 # Load reference distributions
 reference_file = os.path.join(PVC_PATH, "reference_distribution.pkl")
 if os.path.exists(reference_file):
@@ -30,21 +44,27 @@ def detect_drift():
 
         drift_report = {}
 
-        # 1. Data Drift: KS test for each feature
+        # 1. Data Drift: KS test for each numeric feature
         for feature in reference["feature_means"].keys():
-            stat, p_value = ks_2samp(df[feature].values,
-                                     np.random.normal(reference["feature_means"][feature],
-                                                      reference["feature_stds"][feature],
-                                                      len(df)))
-            drift_report[f"{feature}_drift"] = (p_value < 0.05)
+            if feature in df.columns:
+                stat, p_value = ks_2samp(
+                    df[feature].values,
+                    np.random.normal(
+                        reference["feature_means"][feature],
+                        reference["feature_stds"][feature],
+                        len(df)
+                    )
+                )
+                drift_report[f"{feature}_drift"] = bool(p_value < 0.05)
 
-        # 2. Label Drift: compare churn distribution
-        if "Churn" in df.columns:
-            new_dist = df["Churn"].map({'Yes':1, 'No':0}).value_counts(normalize=True).to_dict()
-            drift_report["label_drift"] = any(
-                abs(new_dist.get(k,0) - reference["label_distribution"].get(k,0)) > 0.1
+        # 2. Label Drift: compare Exited distribution
+        if "Exited" in df.columns:
+            new_dist = df["Exited"].value_counts(normalize=True).to_dict()
+            drift_report["label_drift"] = bool(any(
+                abs(new_dist.get(k, 0) - reference["label_distribution"].get(k, 0)) > 0.1
                 for k in reference["label_distribution"].keys()
-            )
+            ))
+
 
         # 3. Concept Drift: placeholder
         drift_report["concept_drift"] = "monitor prediction accuracy over time"
@@ -60,9 +80,12 @@ def detect_drift():
                 train_response = requests.post(training_url, json=data)
                 response["training_response"] = train_response.json()
 
-        return jsonify({"drift_detected": drift_detected})
-        
+        log_event("drift", "success", {"drift_detected": drift_detected})
+        return jsonify(response)
+
     except Exception as e:
+        print("Drift detection error:", e)
+        log_event("drift", "error", {"error": str(e)})
         return jsonify({"error": str(e)}), 500
 
 if __name__ == '__main__':
