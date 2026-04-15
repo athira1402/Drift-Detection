@@ -228,26 +228,28 @@ pipeline {
         stage('Automate Kibana Setup') {
             steps {
                 script {
-                    def kibanaUrl = "http://${HOST_IP}:30561"
+                    // Dynamically get the URL that you just saw in your terminal
+                    def kibanaUrl = sh(script: "minikube service kibana-service --url", returnStdout: true).trim()
                     
+                    echo "Kibana discovered at: ${kibanaUrl}"
+
                     sh """
-                        echo "Waiting for Kibana to be reachable at ${kibanaUrl}..."
+                        echo "Waiting for Kibana to respond at ${kibanaUrl}..."
                         
-                        # Corrected loop syntax
                         while true; do
-                            STATUS=\$(curl -s -o /dev/null -w "%{http_code}" ${kibanaUrl}/api/status || echo "000")
+                            # Use -L to follow redirects if Kibana moves the login page
+                            STATUS=\$(curl -s -L -o /dev/null -w "%{http_code}" ${kibanaUrl}/api/status || echo "000")
                             
                             if [ "\$STATUS" -eq "200" ]; then
-                                echo "✅ Kibana is UP (Status 200)."
+                                echo "✅ Kibana is READY."
                                 break
                             else
-                                echo "Kibana is still starting (Status: \$STATUS)... sleeping 15s"
+                                echo "Kibana is still initializing (Status: \$STATUS)... sleeping 15s"
                                 sleep 15
                             fi
                         done
 
-                        echo "Creating project-logs-* index pattern..."
-                        
+                        echo "Creating index pattern..."
                         curl -X POST "${kibanaUrl}/api/saved_objects/index-pattern/project-logs-pattern" \
                         -H "kbn-xsrf: true" \
                         -H "Content-Type: application/json" \
@@ -256,7 +258,7 @@ pipeline {
                             "title": "project-logs-*",
                             "timeFieldName": "@timestamp"
                         }
-                        }' || echo "Notice: Index pattern setup skipped."
+                        }'
                     """
                 }
             }
