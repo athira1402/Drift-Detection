@@ -33,8 +33,13 @@ spec:
           
           # Delete any existing objects with the same IDs to avoid conflicts
           curl -s -X DELETE "http://kibana-service:5601/api/saved_objects/index-pattern/project-index-pattern" -H 'kbn-xsrf: true'
+          curl -s -X DELETE "http://kibana-service:5601/api/saved_objects/visualization/total-events" -H 'kbn-xsrf: true'
+          curl -s -X DELETE "http://kibana-service:5601/api/saved_objects/visualization/failure-events" -H 'kbn-xsrf: true'
           curl -s -X DELETE "http://kibana-service:5601/api/saved_objects/visualization/logs-by-service" -H 'kbn-xsrf: true'
           curl -s -X DELETE "http://kibana-service:5601/api/saved_objects/visualization/status-breakdown" -H 'kbn-xsrf: true'
+          curl -s -X DELETE "http://kibana-service:5601/api/saved_objects/visualization/outcome-by-service" -H 'kbn-xsrf: true'
+          curl -s -X DELETE "http://kibana-service:5601/api/saved_objects/visualization/events-over-time" -H 'kbn-xsrf: true'
+          curl -s -X DELETE "http://kibana-service:5601/api/saved_objects/visualization/top-error-messages" -H 'kbn-xsrf: true'
           curl -s -X DELETE "http://kibana-service:5601/api/saved_objects/dashboard/drift-overview" -H 'kbn-xsrf: true'
           
           echo "Importing Unified Project Dashboard..."
