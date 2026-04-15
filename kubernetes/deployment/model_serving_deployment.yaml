@@ -14,7 +14,7 @@ spec:
     spec:
       containers:
       - name: model-serving
-        image: kirtinigam003/model_serving:latest
+        image: athira1402/model_serving:latest
         resources:
           requests:
             cpu: "100m"      # 0.1 CPU core
