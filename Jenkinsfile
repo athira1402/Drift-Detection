@@ -228,29 +228,35 @@ pipeline {
         stage('Automate Kibana Setup') {
             steps {
                 script {
-                    // Use the specific NodePort 30561 identified from your service list
                     def kibanaUrl = "http://${HOST_IP}:30561"
                     
                     sh """
                         echo "Waiting for Kibana to be reachable at ${kibanaUrl}..."
                         
-                        # Wait loop: checks if Kibana status API returns 200 OK
-                        until \$(curl -s -o /dev/null -w "%{http_code}" ${kibanaUrl}/api/status) -eq 200; do
-                            echo "Kibana is starting up... sleeping 15s"
-                            sleep 15
+                        # Corrected loop syntax
+                        while true; do
+                            STATUS=\$(curl -s -o /dev/null -w "%{http_code}" ${kibanaUrl}/api/status || echo "000")
+                            
+                            if [ "\$STATUS" -eq "200" ]; then
+                                echo "✅ Kibana is UP (Status 200)."
+                                break
+                            else
+                                echo "Kibana is still starting (Status: \$STATUS)... sleeping 15s"
+                                sleep 15
+                            fi
                         done
 
-                        echo "✅ Kibana is UP. Creating project-logs-* index pattern..."
+                        echo "Creating project-logs-* index pattern..."
                         
                         curl -X POST "${kibanaUrl}/api/saved_objects/index-pattern/project-logs-pattern" \
                         -H "kbn-xsrf: true" \
                         -H "Content-Type: application/json" \
                         -d '{
-                          "attributes": {
+                        "attributes": {
                             "title": "project-logs-*",
                             "timeFieldName": "@timestamp"
-                          }
-                        }' || echo "Notice: Index pattern setup skipped (possibly already exists)."
+                        }
+                        }' || echo "Notice: Index pattern setup skipped."
                     """
                 }
             }
