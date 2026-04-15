@@ -216,6 +216,7 @@ pipeline {
                         kubectl apply -f kubernetes/deployment/ --validate=false
                         kubectl apply -f kubernetes/service/ --validate=false
 
+                        kubectl apply -f kubernetes/elk/ --validate=false
                         kubectl apply -f kubernetes/hpa.yaml --validate=false
                         
                         # 3. Show current status
