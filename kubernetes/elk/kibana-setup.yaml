@@ -1,0 +1,40 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: kibana-setup
+  labels:
+    app: kibana-setup
+spec:
+  template:
+    spec:
+      containers:
+      - name: setup
+        image: curlimages/curl:7.85.0
+        command:
+        - /bin/sh
+        - -c
+        - |
+          # Wait for Kibana to be ready
+          echo "Waiting for Kibana..."
+          until curl -s http://elasticsearch:9200; do echo "Waiting for ES..."; sleep 2; done
+          until curl -s http://kibana-service:5601/api/status | grep -q "available"; do 
+            echo "Waiting for Kibana API..."; 
+            sleep 5; 
+          done
+          
+          echo "Kibana is ready. Creating index pattern..."
+          
+          # Create Filebeat Index Pattern
+          curl -X POST "http://kibana-service:5601/api/saved_objects/index-pattern/filebeat-*" \
+            -H 'kbn-xsrf: true' \
+            -H 'Content-Type: application/json' \
+            -d '{
+              "attributes": {
+                "title": "filebeat-*",
+                "timeFieldName": "@timestamp"
+              }
+            }'
+          
+          echo "Done!"
+      restartPolicy: OnFailure
+  backoffLimit: 10
