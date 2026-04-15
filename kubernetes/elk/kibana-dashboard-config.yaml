@@ -1,0 +1,12 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: kibana-dashboard-config
+  labels:
+    app: kibana-setup
+data:
+  dashboard.ndjson: |-
+    {"type":"index-pattern","id":"project-index-pattern","attributes":{"title":"project-logs-*","timeFieldName":"@timestamp"}}
+    {"type":"visualization","id":"logs-by-service","attributes":{"title":"Logs by Service","visState":"{\"title\":\"Logs by Service\",\"type\":\"pie\",\"params\":{\"addTooltip\":true,\"addLegend\":true,\"legendPosition\":\"right\",\"isDonut\":false,\"labels\":{\"show\":false,\"values\":true,\"last_level\":true,\"truncate\":100}},\"aggs\":[{\"id\":\"1\",\"enabled\":true,\"type\":\"count\",\"schema\":\"metric\",\"params\":{}},{\"id\":\"2\",\"enabled\":true,\"type\":\"terms\",\"schema\":\"segment\",\"params\":{\"field\":\"service.keyword\",\"size\":10,\"order\":\"desc\",\"orderBy\":\"1\"}}]}","uiStateJSON":"{}","description":"","version":1},"references":[{"name":"tag_0","type":"index-pattern","id":"project-index-pattern"}]}
+    {"type":"visualization","id":"status-breakdown","attributes":{"title":"Status Breakdown","visState":"{\"title\":\"Status Breakdown\",\"type\":\"goal\",\"params\":{\"addTooltip\":true,\"addLegend\":true,\"isDonut\":false,\"labels\":{\"show\":true,\"values\":true}},\"aggs\":[{\"id\":\"1\",\"enabled\":true,\"type\":\"count\",\"schema\":\"metric\",\"params\":{}},{\"id\":\"2\",\"enabled\":true,\"type\":\"terms\",\"schema\":\"group\",\"params\":{\"field\":\"status.keyword\",\"size\":10,\"order\":\"desc\",\"orderBy\":\"1\"}}]}","uiStateJSON":"{}","description":"","version":1},"references":[{"name":"tag_0","type":"index-pattern","id":"project-index-pattern"}]}
+    {"type":"dashboard","id":"drift-overview","attributes":{"title":"Drift Detection Overview","panelsJSON":"[{\"gridData\":{\"x\":0,\"y\":0,\"w\":24,\"h\":15,\"i\":\"1\"},\"version\":\"7.17.10\",\"panelIndex\":\"1\",\"type\":\"visualization\",\"id\":\"logs-by-service\",\"embeddableConfig\":{}},{\"gridData\":{\"x\":24,\"y\":0,\"w\":24,\"h\":15,\"i\":\"2\"},\"version\":\"7.17.10\",\"panelIndex\":\"2\",\"type\":\"visualization\",\"id\":\"status-breakdown\",\"embeddableConfig\":{}}]","optionsJSON":"{\"useMargins\":true,\"hidePanelTitles\":false}","version":1,"timeRestore":false,"kibanaSavedObjectMeta":{"searchSourceJSON":"{\"query\":{\"query\":\"\",\"language\":\"kuery\"},\"filter\":[]}"}},"references":[{"name":"panel_0","type":"visualization","id":"logs-by-service"},{"name":"panel_1","type":"visualization","id":"status-breakdown"}]}

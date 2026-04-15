@@ -7,9 +7,16 @@ metadata:
 spec:
   template:
     spec:
+      volumes:
+      - name: dashboard
+        configMap:
+          name: kibana-dashboard-config
       containers:
       - name: setup
         image: curlimages/curl:7.85.0
+        volumeMounts:
+        - name: dashboard
+          mountPath: /mnt/dashboard
         command:
         - /bin/sh
         - -c
@@ -22,18 +29,19 @@ spec:
             sleep 5; 
           done
           
-          echo "Kibana is ready. Creating index pattern..."
+          echo "Kibana is ready. Cleaning up old setup..."
           
-          # Create Filebeat Index Pattern
-          curl -X POST "http://kibana-service:5601/api/saved_objects/index-pattern/filebeat-*" \
+          # Delete any existing objects with the same IDs to avoid conflicts
+          curl -s -X DELETE "http://kibana-service:5601/api/saved_objects/index-pattern/project-index-pattern" -H 'kbn-xsrf: true'
+          curl -s -X DELETE "http://kibana-service:5601/api/saved_objects/dashboard/drift-overview" -H 'kbn-xsrf: true'
+          
+          echo "Importing Unified Project Dashboard..."
+          
+          # Import Unified System (Pattern + Viz + Dashboard)
+          # Use overwrite=true and create_new_id=false to enforce our IDs
+          curl -s -X POST "http://kibana-service:5601/api/saved_objects/_import?overwrite=true" \
             -H 'kbn-xsrf: true' \
-            -H 'Content-Type: application/json' \
-            -d '{
-              "attributes": {
-                "title": "filebeat-*",
-                "timeFieldName": "@timestamp"
-              }
-            }'
+            --form file=@/mnt/dashboard/dashboard.ndjson
           
           echo "Done!"
       restartPolicy: OnFailure
