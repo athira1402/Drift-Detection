@@ -216,6 +216,16 @@ pipeline {
                         kubectl apply -f kubernetes/deployment/ --validate=false
                         kubectl apply -f kubernetes/service/ --validate=false
 
+                        # Force restart so :latest images are re-pulled and new logging code is used
+                        kubectl rollout restart deployment/data-ingestion
+                        kubectl rollout restart deployment/model-training
+                        kubectl rollout restart deployment/model-serving
+                        kubectl rollout restart deployment/drift-detection
+                        kubectl rollout status deployment/data-ingestion --timeout=180s
+                        kubectl rollout status deployment/model-training --timeout=180s
+                        kubectl rollout status deployment/model-serving --timeout=180s
+                        kubectl rollout status deployment/drift-detection --timeout=180s
+
                         # Jobs are immutable; delete setup job so updated template can be recreated
                         kubectl delete job kibana-setup --ignore-not-found=true
                         kubectl apply -f kubernetes/elk/ --validate=false

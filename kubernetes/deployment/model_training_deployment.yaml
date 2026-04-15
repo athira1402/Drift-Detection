@@ -15,6 +15,7 @@ spec:
       containers:
       - name: model-training
         image: athira1402/model_training:latest
+        imagePullPolicy: Always
         resources:
           requests:
             cpu: "200m"      # This stays "m" for millicores

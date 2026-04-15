@@ -15,6 +15,7 @@ spec:
       containers:
       - name: model-serving
         image: athira1402/model_serving:latest
+        imagePullPolicy: Always
         resources:
           requests:
             cpu: "100m"      # 0.1 CPU core

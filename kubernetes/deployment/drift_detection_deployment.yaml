@@ -15,6 +15,7 @@ spec:
       containers:
       - name: drift-detection
         image: athira1402/drift_detection:latest
+        imagePullPolicy: Always
         resources:
           requests:
             cpu: "100m"      # 0.1 CPU core

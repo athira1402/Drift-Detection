@@ -15,6 +15,7 @@ spec:
       containers:
       - name: data-ingestion
         image: athira1402/data_ingestion:latest
+        imagePullPolicy: Always
         resources:
           requests:
             cpu: "100m"      # 0.1 CPU core
