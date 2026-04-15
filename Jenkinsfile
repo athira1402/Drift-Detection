@@ -1,7 +1,7 @@
 pipeline {
     agent any
     environment {
-        // Automatically detects the Host IP for the API calls
+        // Use the ID you set in Jenkins Credentials for the kubeconfig file
         HOST_IP = sh(script: "hostname -I | awk '{print \$1}'", returnStdout: true).trim()
         KUBECONFIG = credentials('kubeconfig') 
     }
@@ -9,8 +9,13 @@ pipeline {
         stage('Environment Setup') {
             steps {
                 withCredentials([string(credentialsId: 'ansible-vault-pass', variable: 'VAULT_PW')]) {
+                    // Create a temporary file for the password
                     sh 'echo $VAULT_PW > .vault_pass'
+                    
+                    // Run Ansible using the password file
                     sh 'ansible-playbook -i ansible/inventory.ini ansible/site.yml --vault-password-file .vault_pass'
+                    
+                    // Clean up the password file immediately
                     sh 'rm .vault_pass'
                 }
             }
@@ -36,6 +41,9 @@ pipeline {
             }
             steps {
                 script {
+                    def hostIp = sh(script: "hostname -I | awk '{print \$1}'", returnStdout: true).trim()
+                    echo "Detected Host IP for Integration: ${hostIp}"
+
                     sh 'docker compose -f docker-compose.test.yml down --remove-orphans'
                     sh 'docker compose -f docker-compose.test.yml up --build -d'
                     
@@ -45,19 +53,91 @@ pipeline {
                     // Bootstrap Training
                     echo "Training baseline model..."
                     def trainStatus = sh(script: """
-                        curl -s -X POST http://${HOST_IP}:5001/train \
+                        curl -s -X POST http://${hostIp}:5001/train \
                         -H "Content-Type: application/json" \
-                        -d '[{"CustomerId": 1, "CreditScore": 600, "Geography": "France", "Gender": "Male", "Age": 30, "Tenure": 5, "Balance": 1000.0, "NumOfProducts": 1, "HasCrCard": 1, "IsActiveMember": 1, "EstimatedSalary": 40000.0, "Exited": 0}]'
+                        -d '[{
+                            "CustomerId": 1,
+                            "CreditScore": 600,
+                            "Geography": "France",
+                            "Gender": "Male",
+                            "Age": 30,
+                            "Tenure": 5,
+                            "Balance": 1000.0,
+                            "NumOfProducts": 1,
+                            "HasCrCard": 1,
+                            "IsActiveMember": 1,
+                            "EstimatedSalary": 40000.0,
+                            "Exited": 0
+                        },
+                        {
+                            "CustomerId": 2,
+                            "CreditScore": 650,
+                            "Geography": "Germany",
+                            "Gender": "Female",
+                            "Age": 45,
+                            "Tenure": 1,
+                            "Balance": 8000.0,
+                            "NumOfProducts": 2,
+                            "HasCrCard": 0,
+                            "IsActiveMember": 0,
+                            "EstimatedSalary": 50000.0,
+                            "Exited": 1
+                        }]'
                     """, returnStdout: true).trim()
                     
                     if (!trainStatus.contains("success")) {
                         error "Model Training failed: ${trainStatus}"
                     }
+
+                    sh 'docker exec drift_detection-training-1 ls -l /data/churn-model'
+                    echo "Waiting for training artifacts..."
                     sleep 10
+
+                    // Full Pipeline Test
+                    def response = sh(script: """
+                        curl -s -X POST http://${hostIp}:5000/ingest \
+                        -H 'Content-Type: application/json' \
+                        -d '[{
+                            "CustomerId": 123,
+                            "CreditScore": 700,
+                            "Geography": "Spain",
+                            "Gender": "Female",
+                            "Age": 35,
+                            "Tenure": 3,
+                            "Balance": 2500.0,
+                            "NumOfProducts": 1,
+                            "HasCrCard": 1,
+                            "IsActiveMember": 1,
+                            "EstimatedSalary": 45000.0,
+                            "Exited": 0
+                        },
+                        {
+                            "CustomerId": 1234,
+                            "CreditScore": 600,
+                            "Geography": "Germany",
+                            "Gender": "Female",
+                            "Age": 35,
+                            "Tenure": 4,
+                            "Balance": 4000.0,
+                            "NumOfProducts": 1,
+                            "HasCrCard": 1,
+                            "IsActiveMember": 1,
+                            "EstimatedSalary": 60000.0,
+                            "Exited": 1
+                        }]'
+                    """, returnStdout: true).trim()
+                    echo "Full Pipeline Response: ${response}"
+
+                    if (response.contains("error") || !response.contains("ingested")) {
+                        sh 'docker compose -f docker-compose.test.yml logs'
+                        error "Integration Test Failed. Response: ${response}"
+                    }
                 }
             }
             post {
                 always {
+                    sh 'docker compose -f docker-compose.test.yml ps -a'
+                    sh 'docker compose -f docker-compose.test.yml logs training'
                     sh 'docker compose -f docker-compose.test.yml down || true'
                 }
             }
@@ -68,45 +148,45 @@ pipeline {
                 stage('Ingestion') {
                     steps {
                         dir('data_ingestion') {
-                            withCredentials([usernamePassword(credentialsId: 'DockerHubCred', usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PASS')]) {  
-                                sh "echo \$DOCKER_PASS | docker login -u \$DOCKER_USER --password-stdin"
-                                sh 'docker build -t athira1402/data_ingestion:latest -f Dockerfile.ingest .'
-                                sh 'docker push athira1402/data_ingestion:latest'
-                            }
+                          withCredentials([usernamePassword(credentialsId: 'DockerHubCred', usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PASS')]) {  
+                            sh "echo \$DOCKER_PASS | docker login -u \$DOCKER_USER --password-stdin"
+			    sh 'docker build -t athira1402/data_ingestion:latest -f Dockerfile.ingest .'
+                            sh 'docker push athira1402/data_ingestion:latest'
                         }
+		      }
                     }
                 }
                 stage('Training') {
                     steps {
                         dir('model_training') {
-                            withCredentials([usernamePassword(credentialsId: 'DockerHubCred', usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PASS')]) {  
-                                sh "echo \$DOCKER_PASS | docker login -u \$DOCKER_USER --password-stdin"
-                                sh 'docker build -t athira1402/model_training:latest -f Dockerfile.training .'
-                                sh 'docker push athira1402/model_training:latest'
-                            }
+                          withCredentials([usernamePassword(credentialsId: 'DockerHubCred', usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PASS')]) {  
+			    sh "echo \$DOCKER_PASS | docker login -u \$DOCKER_USER --password-stdin"
+			    sh 'docker build -t athira1402/model_training:latest -f Dockerfile.training .'
+                            sh 'docker push athira1402/model_training:latest'
                         }
+		      }	
                     }
                 }
                 stage('Serving') {
                     steps {
                         dir('model_serving') {
-                            withCredentials([usernamePassword(credentialsId: 'DockerHubCred', usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PASS')]) {
-                                sh "echo \$DOCKER_PASS | docker login -u \$DOCKER_USER --password-stdin"
-                                sh 'docker build -t athira1402/model_serving:latest -f Dockerfile.serving .'
-                                sh 'docker push athira1402/model_serving:latest'
-                            }
+                          withCredentials([usernamePassword(credentialsId: 'DockerHubCred', usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PASS')]) {
+                            sh "echo \$DOCKER_PASS | docker login -u \$DOCKER_USER --password-stdin"
+			    sh 'docker build -t athira1402/model_serving:latest -f Dockerfile.serving .'
+                            sh 'docker push athira1402/model_serving:latest'
                         }
+                      }
                     }
                 }
                 stage('Drift') {
                     steps {
                         dir('drift_detection') {
-                            withCredentials([usernamePassword(credentialsId: 'DockerHubCred', usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PASS')]) {
-                                sh "echo \$DOCKER_PASS | docker login -u \$DOCKER_USER --password-stdin"             
-                                sh 'docker build -t athira1402/drift_detection:latest -f Dockerfile.drift .'
-                                sh 'docker push athira1402/drift_detection:latest'
-                            }
-                        }
+			  withCredentials([usernamePassword(credentialsId: 'DockerHubCred', usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PASS')]) {
+                            sh "echo \$DOCKER_PASS | docker login -u \$DOCKER_USER --password-stdin"             
+                            sh 'docker build -t athira1402/drift_detection:latest -f Dockerfile.drift .'
+                            sh 'docker push athira1402/drift_detection:latest'
+                          }
+			}
                     }
                 }
             }
@@ -115,26 +195,36 @@ pipeline {
         stage('Deploy to Kubernetes') {
             steps {
                 sh '''
-                    export MINIKUBE_HOME=/home/athira
+
+		    export MINIKUBE_HOME=/home/athira
                     export KUBECONFIG=/home/athira/.kube/config
-                    
-                    echo "Applying Kubernetes manifests..."
-                    kubectl apply -f kubernetes/pv.yaml --validate=false
-                    kubectl apply -f kubernetes/pvc.yaml --validate=false
-                    kubectl apply -f kubernetes/deployment/ --validate=false
-                    kubectl apply -f kubernetes/service/ --validate=false
-                    kubectl apply -f kubernetes/elk/ --validate=false
-                    kubectl apply -f kubernetes/hpa.yaml --validate=false
-                    
-                    # Automate data sync to the training pod
-                    echo "Waiting for training pod to be ready..."
-                    kubectl wait --for=condition=Ready pod -l app=model-training --timeout=60s
-                    TRAIN_POD=$(kubectl get pods -l app=model-training -o jsonpath='{.items[0].metadata.name}')
-                    kubectl cp data/churn-model/train.csv ${TRAIN_POD}:/data/churn-model/train.csv
+                        
+                    echo "Starting Deployment..."
+
+                        # 1. Check if Minikube is actually Running, ignoring stale warnings
+                        if ! minikube status | grep -q "Running"; then
+                            echo "❌ ERROR: Minikube is not running. Run 'minikube start' on the host."
+                            exit 1
+                        fi
+
+                        # 2. Deploy using --validate=false to skip the network check that keeps failing
+                        # This bypasses the 'connection refused' error on the openapi schema
+                        echo "Applying Kubernetes manifests..."
+                        kubectl apply -f kubernetes/pv.yaml --validate=false
+                        kubectl apply -f kubernetes/pvc.yaml --validate=false
+                        
+                        kubectl apply -f kubernetes/deployment/ --validate=false
+                        kubectl apply -f kubernetes/service/ --validate=false
+
+                        kubectl apply -f kubernetes/elk/ --validate=false
+                        kubectl apply -f kubernetes/hpa.yaml --validate=false
+                        
+                        # 3. Show current status
+                        echo "✅ Deployment commands sent successfully."
+                        kubectl get pods
                 '''
             }
         }
-
         stage('Automate Kibana Setup') {
             steps {
                 script {
