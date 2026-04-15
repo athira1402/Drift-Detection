@@ -228,38 +228,43 @@ pipeline {
         stage('Automate Kibana Setup') {
             steps {
                 script {
-                    // Dynamically get the URL that you just saw in your terminal
-                    def kibanaUrl = sh(script: "minikube service kibana-service --url", returnStdout: true).trim()
-                    
-                    echo "Kibana discovered at: ${kibanaUrl}"
-
-                    sh """
-                        echo "Waiting for Kibana to respond at ${kibanaUrl}..."
+                    sh '''
+                        echo "Starting background port-forward to Kibana..."
+                        # Start port forwarding in the background and save the PID
+                        kubectl port-forward svc/kibana-service 5601:5601 > pf.log 2>&1 &
+                        PF_PID=$!
                         
-                        while true; do
-                            # Use -L to follow redirects if Kibana moves the login page
-                            STATUS=\$(curl -s -L -o /dev/null -w "%{http_code}" ${kibanaUrl}/api/status || echo "000")
-                            
-                            if [ "\$STATUS" -eq "200" ]; then
+                        echo "Waiting for Kibana to respond on localhost:5601..."
+                        
+                        # Wait loop
+                        COUNT=0
+                        while [ $COUNT -lt 20 ]; do
+                            STATUS=$(curl -s -L -o /dev/null -w "%{http_code}" http://localhost:5601/api/status || echo "000")
+                            if [ "$STATUS" -eq "200" ]; then
                                 echo "✅ Kibana is READY."
                                 break
-                            else
-                                echo "Kibana is still initializing (Status: \$STATUS)... sleeping 15s"
-                                sleep 15
                             fi
+                            echo "Kibana status: $STATUS. Waiting..."
+                            sleep 15
+                            COUNT=$((COUNT+1))
                         done
 
+                        if [ "$STATUS" -ne "200" ]; then
+                            echo "❌ Kibana failed to start in time. Logs:"
+                            cat pf.log
+                            kill $PF_PID
+                            exit 1
+                        fi
+
                         echo "Creating index pattern..."
-                        curl -X POST "${kibanaUrl}/api/saved_objects/index-pattern/project-logs-pattern" \
+                        curl -X POST "http://localhost:5601/api/saved_objects/index-pattern/project-logs-pattern" \
                         -H "kbn-xsrf: true" \
                         -H "Content-Type: application/json" \
-                        -d '{
-                        "attributes": {
-                            "title": "project-logs-*",
-                            "timeFieldName": "@timestamp"
-                        }
-                        }'
-                    """
+                        -d '{"attributes": {"title": "project-logs-*", "timeFieldName": "@timestamp"}}'
+                        
+                        # Cleanup: stop the background port-forward
+                        kill $PF_PID
+                    '''
                 }
             }
         }
