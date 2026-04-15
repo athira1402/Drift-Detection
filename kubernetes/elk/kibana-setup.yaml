@@ -33,6 +33,8 @@ spec:
           
           # Delete any existing objects with the same IDs to avoid conflicts
           curl -s -X DELETE "http://kibana-service:5601/api/saved_objects/index-pattern/project-index-pattern" -H 'kbn-xsrf: true'
+          curl -s -X DELETE "http://kibana-service:5601/api/saved_objects/visualization/logs-by-service" -H 'kbn-xsrf: true'
+          curl -s -X DELETE "http://kibana-service:5601/api/saved_objects/visualization/status-breakdown" -H 'kbn-xsrf: true'
           curl -s -X DELETE "http://kibana-service:5601/api/saved_objects/dashboard/drift-overview" -H 'kbn-xsrf: true'
           
           echo "Importing Unified Project Dashboard..."
@@ -42,6 +44,12 @@ spec:
           curl -s -X POST "http://kibana-service:5601/api/saved_objects/_import?overwrite=true" \
             -H 'kbn-xsrf: true' \
             --form file=@/mnt/dashboard/dashboard.ndjson
+
+          echo "Setting default index pattern..."
+          curl -s -X POST "http://kibana-service:5601/api/index_patterns/default" \
+            -H 'kbn-xsrf: true' \
+            -H 'Content-Type: application/json' \
+            -d '{"index_pattern_id":"project-index-pattern","force":true}'
           
           echo "Done!"
       restartPolicy: OnFailure
