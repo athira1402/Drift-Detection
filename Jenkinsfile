@@ -229,41 +229,51 @@ pipeline {
             steps {
                 script {
                     sh '''
+                        echo "Cleaning up any existing port-forwards on 5601..."
+                        # Kill existing process using the port to avoid "Address already in use"
+                        fuser -k 5601/tcp || true
+
                         echo "Starting background port-forward to Kibana..."
-                        # Start port forwarding in the background and save the PID
-                        kubectl port-forward svc/kibana-service 5601:5601 > pf.log 2>&1 &
+                        # Use 0.0.0.0 to ensure the tunnel is accessible across WSL interfaces
+                        kubectl port-forward svc/kibana-service 5601:5601 --address 0.0.0.0 > pf.log 2>&1 &
                         PF_PID=$!
                         
-                        echo "Waiting for Kibana to respond on localhost:5601..."
+                        # IMPORTANT: Give the port-forward process a few seconds to initialize
+                        echo "Stabilizing tunnel..."
+                        sleep 10
                         
-                        # Wait loop
+                        echo "Waiting for Kibana to respond at http://127.0.0.1:5601..."
+                        
                         COUNT=0
                         while [ $COUNT -lt 20 ]; do
-                            STATUS=$(curl -s -L -o /dev/null -w "%{http_code}" http://localhost:5601/api/status || echo "000")
+                            # Using 127.0.0.1 is more explicit than 'localhost' in some Jenkins/WSL setups
+                            STATUS=$(curl -s -L -o /dev/null -w "%{http_code}" http://127.0.0.1:5601/api/status || echo "000")
+                            
                             if [ "$STATUS" -eq "200" ]; then
                                 echo "✅ Kibana is READY."
                                 break
                             fi
-                            echo "Kibana status: $STATUS. Waiting..."
+                            
+                            echo "Kibana status: $STATUS (Attempt $COUNT/20). Waiting 15s..."
                             sleep 15
                             COUNT=$((COUNT+1))
                         done
 
                         if [ "$STATUS" -ne "200" ]; then
-                            echo "❌ Kibana failed to start in time. Logs:"
+                            echo "❌ Kibana connection failed. Port-forward logs:"
                             cat pf.log
-                            kill $PF_PID
+                            kill $PF_PID || true
                             exit 1
                         fi
 
-                        echo "Creating index pattern..."
-                        curl -X POST "http://localhost:5601/api/saved_objects/index-pattern/project-logs-pattern" \
+                        echo "Creating index pattern 'project-logs-*'..."
+                        curl -X POST "http://127.0.0.1:5601/api/saved_objects/index-pattern/project-logs-pattern" \
                         -H "kbn-xsrf: true" \
                         -H "Content-Type: application/json" \
                         -d '{"attributes": {"title": "project-logs-*", "timeFieldName": "@timestamp"}}'
                         
-                        # Cleanup: stop the background port-forward
-                        kill $PF_PID
+                        echo "✅ Setup complete. Cleaning up..."
+                        kill $PF_PID || true
                     '''
                 }
             }
