@@ -216,6 +216,8 @@ pipeline {
                         kubectl apply -f kubernetes/deployment/ --validate=false
                         kubectl apply -f kubernetes/service/ --validate=false
 
+                        # Jobs are immutable; delete setup job so updated template can be recreated
+                        kubectl delete job kibana-setup --ignore-not-found=true
                         kubectl apply -f kubernetes/elk/ --validate=false
                         kubectl apply -f kubernetes/hpa.yaml --validate=false
                         
