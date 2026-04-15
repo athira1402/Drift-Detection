@@ -225,46 +225,5 @@ pipeline {
                 '''
             }
         }
-        stage('Automate Kibana Setup') {
-            steps {
-                script {
-                    // Force Jenkins to use the host's minikube context
-                    sh "minikube update-context"
-                    
-                    // Get the current Minikube IP and NodePort
-                    def minikubeIp = sh(script: "minikube ip", returnStdout: true).trim()
-                    def nodePort = sh(script: "kubectl get svc kibana-service -o jsonpath='{.spec.ports[0].nodePort}'", returnStdout: true).trim()
-                    
-                    def kibanaUrl = "http://${minikubeIp}:${nodePort}"
-                    
-                    echo "Current Minikube IP: ${minikubeIp}"
-                    echo "Kibana NodePort: ${nodePort}"
-                    echo "Attempting to reach: ${kibanaUrl}"
-
-                    sh """
-                        # Double check the API connection before starting the loop
-                        kubectl cluster-info || (echo 'API unreachable' && exit 1)
-
-                        while true; do
-                            STATUS=\$(curl -s -o /dev/null -w "%{http_code}" ${kibanaUrl}/api/status || echo "000")
-                            
-                            if [ "\$STATUS" -eq "200" ]; then
-                                echo "✅ Kibana reached!"
-                                break
-                            else
-                                echo "Status: \$STATUS. Kibana is still starting... sleeping 15s"
-                                sleep 15
-                            fi
-                        done
-
-                        echo "Creating project-logs-* index pattern..."
-                        curl -X POST "${kibanaUrl}/api/saved_objects/index-pattern/project-logs-pattern" \
-                        -H "kbn-xsrf: true" \
-                        -H "Content-Type: application/json" \
-                        -d '{"attributes": {"title": "project-logs-*", "timeFieldName": "@timestamp"}}'
-                    """
-                }
-            }
-        }
     }
 }
