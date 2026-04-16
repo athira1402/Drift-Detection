@@ -21,18 +21,6 @@ pipeline {
             }
         }
 
-        stage('ELK Secrets (Vault)') {
-            steps {
-                withCredentials([
-                    string(credentialsId: 'ansible-vault-pass', variable: 'VAULT_PW')
-                ]) {
-                    sh 'echo $VAULT_PW > .vault_pass'
-                    sh 'ansible-playbook -i ansible/inventory.ini ansible/site.yml --tags elk --vault-password-file .vault_pass'
-                    sh 'rm .vault_pass'
-                }
-            }
-        }
-
         stage('Run Unit Tests') {
             steps {
                 sh '''
@@ -238,22 +226,37 @@ pipeline {
                         kubectl rollout status deployment/model-serving --timeout=180s
                         kubectl rollout status deployment/drift-detection --timeout=180s
 
-                        # Apply ELK resources explicitly and force a fresh dashboard import each run
-                        kubectl apply -f kubernetes/elk/elasticsearch.yaml --validate=false
-                        kubectl apply -f kubernetes/elk/filebeat.yaml --validate=false
-                        kubectl apply -f kubernetes/elk/kibana.yaml --validate=false
-                        kubectl apply -f kubernetes/elk/kibana-dashboard-config.yaml --validate=false
-
-                        # Jobs are immutable; recreate setup job every deployment
-                        kubectl delete job kibana-setup --ignore-not-found=true
-                        kubectl apply -f kubernetes/elk/kibana-setup.yaml --validate=false
-                        kubectl wait --for=condition=complete job/kibana-setup --timeout=180s
-                        kubectl logs job/kibana-setup --tail=200
                         kubectl apply -f kubernetes/hpa.yaml --validate=false
                         
                         # 3. Show current status
                         echo "✅ Deployment commands sent successfully."
                         kubectl get pods
+                '''
+            }
+        }
+
+        stage('ELK Dashboard Setup') {
+            steps {
+                sh '''
+
+		    export MINIKUBE_HOME=/home/athira
+                    export KUBECONFIG=/home/athira/.kube/config
+
+                    echo "Setting up ELK + Kibana dashboard..."
+
+                    # Apply ELK resources explicitly and force a fresh dashboard import each run
+                    kubectl apply -f kubernetes/elk/elasticsearch.yaml --validate=false
+                    kubectl apply -f kubernetes/elk/filebeat.yaml --validate=false
+                    kubectl apply -f kubernetes/elk/kibana.yaml --validate=false
+                    kubectl apply -f kubernetes/elk/kibana-dashboard-config.yaml --validate=false
+
+                    # Jobs are immutable; recreate setup job every deployment
+                    kubectl delete job kibana-setup --ignore-not-found=true
+                    kubectl apply -f kubernetes/elk/kibana-setup.yaml --validate=false
+                    kubectl wait --for=condition=complete job/kibana-setup --timeout=180s
+                    kubectl logs job/kibana-setup --tail=200
+
+                    echo "✅ ELK dashboard setup complete."
                 '''
             }
         }
