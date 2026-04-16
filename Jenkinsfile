@@ -21,6 +21,18 @@ pipeline {
             }
         }
 
+        stage('ELK Secrets (Vault)') {
+            steps {
+                withCredentials([
+                    string(credentialsId: 'ansible-vault-pass', variable: 'VAULT_PW')
+                ]) {
+                    sh 'echo $VAULT_PW > .vault_pass'
+                    sh 'ansible-playbook -i ansible/inventory.ini ansible/site.yml --tags elk --vault-password-file .vault_pass'
+                    sh 'rm .vault_pass'
+                }
+            }
+        }
+
         stage('Run Unit Tests') {
             steps {
                 sh '''
