@@ -42,6 +42,11 @@
   apt:
     name: [docker-ce, docker-ce-cli, containerd.io, docker-compose-plugin]
     update_cache: yes
+    lock_timeout: 300
+  register: docker_apt_res
+  until: docker_apt_res is success
+  retries: 10
+  delay: 15
 
 - name: Ensure Jenkins user is in Docker group
   user:
