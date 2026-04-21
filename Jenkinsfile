@@ -89,7 +89,6 @@ pipeline {
                         error "Model Training failed: ${trainStatus}"
                     }
 
-                    sh 'docker exec drift_detection-training-1 ls -l /data/churn-model'
                     echo "Waiting for training artifacts..."
                     sleep 10
 
