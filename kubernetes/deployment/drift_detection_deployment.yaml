@@ -4,6 +4,11 @@ metadata:
   name: drift-detection
 spec:
   replicas: 1
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 0
+      maxUnavailable: 1
   selector:
     matchLabels:
       app: drift-detection
@@ -14,8 +19,7 @@ spec:
     spec:
       containers:
       - name: drift-detection
-        image: athira1402/drift_detection:latest
-        imagePullPolicy: Always
+        image: kirtinigam003/drift_detection:latest
         resources:
           requests:
             cpu: "100m"      # 0.1 CPU core
@@ -25,8 +29,23 @@ spec:
             memory: "512Mi"
         ports:
         - containerPort: 5003
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 5003
+          initialDelaySeconds: 5
+          periodSeconds: 5
+          timeoutSeconds: 2
+          failureThreshold: 3
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 5003
+          initialDelaySeconds: 20
+          periodSeconds: 10
+          timeoutSeconds: 2
+          failureThreshold: 3
         env:
-        # Training microservice endpoint (used when drift is detected)
         - name: TRAINING_URL
           value: http://model-training-service.default.svc.cluster.local:5001/train
         volumeMounts:

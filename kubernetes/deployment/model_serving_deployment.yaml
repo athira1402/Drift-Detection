@@ -4,6 +4,11 @@ metadata:
   name: model-serving
 spec:
   replicas: 1
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 0
+      maxUnavailable: 1
   selector:
     matchLabels:
       app: model-serving
@@ -14,8 +19,7 @@ spec:
     spec:
       containers:
       - name: model-serving
-        image: athira1402/model_serving:latest
-        imagePullPolicy: Always
+        image: kirtinigam003/model_serving:latest
         resources:
           requests:
             cpu: "100m"      # 0.1 CPU core
@@ -25,6 +29,22 @@ spec:
             memory: "512Mi"
         ports:
         - containerPort: 5002
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 5002
+          initialDelaySeconds: 5
+          periodSeconds: 5
+          timeoutSeconds: 2
+          failureThreshold: 3
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 5002
+          initialDelaySeconds: 20
+          periodSeconds: 10
+          timeoutSeconds: 2
+          failureThreshold: 3
         volumeMounts:                
         - name: churn-model-storage
           mountPath: /data/churn-model 
