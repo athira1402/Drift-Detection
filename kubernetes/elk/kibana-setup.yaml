@@ -11,19 +11,48 @@ spec:
       - name: dashboard
         configMap:
           name: kibana-dashboard-config
+      - name: es-mappings
+        configMap:
+          name: project-logs-es-mappings
       containers:
       - name: setup
         image: curlimages/curl:7.85.0
         volumeMounts:
         - name: dashboard
           mountPath: /mnt/dashboard
+        - name: es-mappings
+          mountPath: /mnt/es-mappings/mappings.json
+          subPath: mappings.json
+          readOnly: true
         command:
         - /bin/sh
         - -c
         - |
-          # Wait for Kibana to be ready
-          echo "Waiting for Kibana..."
+          echo "Waiting for Elasticsearch..."
           until curl -s http://elasticsearch:9200; do echo "Waiting for ES..."; sleep 2; done
+
+          cp /mnt/es-mappings/mappings.json /tmp/pl-mappings.json
+
+          echo "Installing Elasticsearch index template project-logs-app-fields..."
+          {
+            printf '%s' '{"index_patterns":["project-logs-*"],"priority":500,"template":{"mappings":'
+            cat /tmp/pl-mappings.json
+            printf '%s' '}}'
+          } >/tmp/pl-index-template.json
+          curl -s -X PUT "http://elasticsearch:9200/_index_template/project-logs-app-fields" \
+            -H 'Content-Type: application/json' \
+            --data-binary @/tmp/pl-index-template.json
+
+          echo "Augmenting mappings on existing project-logs-* indices (ignore errors if types conflict)..."
+          curl -s "http://elasticsearch:9200/_cat/indices/project-logs-*?h=index" | while read -r idx; do
+            [ -z "$idx" ] && continue
+            echo "  -> ${idx}"
+            curl -s -X PUT "http://elasticsearch:9200/${idx}/_mapping" \
+              -H 'Content-Type: application/json' \
+              --data-binary @/tmp/pl-mappings.json || true
+          done
+
+          echo "Waiting for Kibana..."
           until curl -s http://kibana-service:5601/api/status | grep -q "available"; do 
             echo "Waiting for Kibana API..."; 
             sleep 5; 
@@ -31,12 +60,10 @@ spec:
           
           echo "Kibana is ready. Cleaning up old setup..."
           
-          # Delete any existing objects with the same IDs to avoid conflicts
           curl -s -X DELETE "http://kibana-service:5601/api/saved_objects/index-pattern/project-index-pattern" -H 'kbn-xsrf: true'
           curl -s -X DELETE "http://kibana-service:5601/api/saved_objects/visualization/total-events" -H 'kbn-xsrf: true'
           curl -s -X DELETE "http://kibana-service:5601/api/saved_objects/visualization/failure-events" -H 'kbn-xsrf: true'
           curl -s -X DELETE "http://kibana-service:5601/api/saved_objects/visualization/logs-by-service" -H 'kbn-xsrf: true'
-          curl -s -X DELETE "http://kibana-service:5601/api/saved_objects/visualization/status-breakdown" -H 'kbn-xsrf: true'
           curl -s -X DELETE "http://kibana-service:5601/api/saved_objects/visualization/outcome-by-service" -H 'kbn-xsrf: true'
           curl -s -X DELETE "http://kibana-service:5601/api/saved_objects/visualization/events-over-time" -H 'kbn-xsrf: true'
           curl -s -X DELETE "http://kibana-service:5601/api/saved_objects/visualization/top-error-messages" -H 'kbn-xsrf: true'
@@ -44,8 +71,6 @@ spec:
           
           echo "Importing Unified Project Dashboard..."
           
-          # Import Unified System (Pattern + Viz + Dashboard)
-          # Use overwrite=true and create_new_id=false to enforce our IDs
           curl -s -X POST "http://kibana-service:5601/api/saved_objects/_import?overwrite=true" \
             -H 'kbn-xsrf: true' \
             --form file=@/mnt/dashboard/dashboard.ndjson
@@ -55,6 +80,34 @@ spec:
             -H 'kbn-xsrf: true' \
             -H 'Content-Type: application/json' \
             -d '{"index_pattern_id":"project-index-pattern","force":true}'
+
+          echo "Waiting for data in project-logs-*..."
+          found_logs=false
+          for _ in $(seq 1 60); do
+            if curl -s "http://elasticsearch:9200/project-logs-*/_count" | grep -q "\"count\":[1-9]"; then
+              found_logs=true
+              break
+            fi
+            echo "Still waiting for some logs to be indexed..."
+            sleep 5
+          done
+          if [ "$found_logs" != "true" ]; then
+            echo "WARN: No project logs indexed yet; continuing dashboard setup."
+          fi
+
+          echo "Refreshing Index Pattern fields..."
+          curl -s -X POST "http://kibana-service:5601/api/index_patterns/index_pattern/project-index-pattern/fields" \
+            -H 'kbn-xsrf: true'
+
+          echo "Verifying dashboard fields via Elasticsearch _field_caps..."
+          FC=$(curl -s "http://elasticsearch:9200/project-logs-*/_field_caps?fields=service.name,event.outcome,event.type,error.type,duration_ms,drift_p_value&include_unmapped=true")
+          for f in service.name event.outcome event.type error.type duration_ms drift_p_value; do
+            if ! echo "$FC" | grep -q "\"$f\""; then
+              echo "WARN: field_caps missing key \"$f\" (no matching index data yet, or mapping conflict)."
+            else
+              echo "OK: $f"
+            fi
+          done
           
           echo "Done!"
       restartPolicy: OnFailure

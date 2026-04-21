@@ -244,17 +244,27 @@ pipeline {
 
                     echo "Setting up ELK + Kibana dashboard..."
 
-                    # Apply ELK resources explicitly and force a fresh dashboard import each run
                     kubectl apply -f kubernetes/elk/elasticsearch.yaml --validate=false
                     kubectl apply -f kubernetes/elk/filebeat.yaml --validate=false
                     kubectl apply -f kubernetes/elk/kibana.yaml --validate=false
+                    kubectl apply -f kubernetes/elk/project-logs-es-mappings-configmap.yaml --validate=false
                     kubectl apply -f kubernetes/elk/kibana-dashboard-config.yaml --validate=false
 
-                    # Jobs are immutable; recreate setup job every deployment
+                    kubectl rollout status deployment/elasticsearch --timeout=300s
+                    kubectl rollout status deployment/kibana --timeout=300s
+
                     kubectl delete job kibana-setup --ignore-not-found=true
                     kubectl apply -f kubernetes/elk/kibana-setup.yaml --validate=false
-                    kubectl wait --for=condition=complete job/kibana-setup --timeout=180s
-                    kubectl logs job/kibana-setup --tail=200
+                    if ! kubectl wait --for=condition=complete job/kibana-setup --timeout=420s; then
+                        echo "kibana-setup did not complete in time. Collecting diagnostics..."
+                        kubectl describe job kibana-setup || true
+                        kubectl logs job/kibana-setup --all-containers=true --tail=300 || true
+                        kubectl get pods -l app=kibana-setup -o wide || true
+                        kubectl get pods -l app=filebeat -o wide || true
+                        kubectl logs -l app=filebeat --tail=200 || true
+                        exit 1
+                    fi
+                    kubectl logs job/kibana-setup --all-containers=true --tail=300
 
                     echo "✅ ELK dashboard setup complete."
                 '''

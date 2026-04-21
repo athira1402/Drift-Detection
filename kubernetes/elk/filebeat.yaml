@@ -10,11 +10,14 @@ data:
       providers:
         - type: kubernetes
           node: ${NODE_NAME}
-          hints.enabled: true
-          hints.default_config:
-            type: container
-            paths:
-              - /var/log/containers/*${data.kubernetes.container.id}.log
+          templates:
+            - condition:
+                regexp:
+                  kubernetes.labels.app: "^(model-training|model-serving|drift-detection|data-ingestion)$"
+              config:
+                - type: container
+                  paths:
+                    - /var/log/containers/*${data.kubernetes.container.id}.log
 
     processors:
       - add_kubernetes_metadata:
@@ -22,18 +25,16 @@ data:
           matchers:
             - logs_path:
                 logs_path: "/var/log/containers/"
-      # 1. Decode Docker JSON
       - decode_json_fields:
           fields: ["message"]
           target: ""
           overwrite_keys: true
-          add_error_key: true
-      # 2. Decode Application Log (extracted from Docker)
+          add_error_key: false
       - decode_json_fields:
           fields: ["log"]
           target: ""
           overwrite_keys: true
-          add_error_key: true
+          add_error_key: false
 
     output.elasticsearch:
       hosts: ['elasticsearch:9200']
@@ -41,6 +42,14 @@ data:
 
     setup.template.name: "project-logs"
     setup.template.pattern: "project-logs-*"
+    setup.template.overwrite: true
+    setup.template.append_fields:
+      - name: duration_ms
+        type: long
+      - name: training_duration_ms
+        type: long
+      - name: drift_p_value
+        type: double
     setup.ilm.enabled: false
 
     logging.level: info
